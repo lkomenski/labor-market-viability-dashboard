@@ -1,7 +1,9 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ExploreFilters } from '../../core/models/explore-filters.model';
+import { BlsApiService } from '../../core/api/bls-api.service';
+import { BlsTimeseriesResponse } from '../../core/models/bls.model';
 
 type ExploreForm = FormGroup<{
   occupationGroup: FormControl<string>;
@@ -107,7 +109,45 @@ type ExploreForm = FormGroup<{
 
       <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
         <h2 class="text-lg font-semibold">Current selection</h2>
+      <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">BLS Connection Test</h2>
+          <button
+            type="button"
+            class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400 disabled:opacity-50"
+            (click)="testCall()"
+            [disabled]="loading"
+          >
+            {{ loading ? 'Loading…' : 'Test API' }}
+          </button>
+        </div>
 
+        <p class="text-sm text-slate-300">
+          Temporary dev utility. Next we’ll connect this to your filters and render results.
+        </p>
+
+        <div *ngIf="error" class="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
+          {{ error }}
+        </div>
+
+        <div *ngIf="result" class="rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200">
+          <div><span class="text-slate-400">Status:</span> {{ result.status }}</div>
+          <div><span class="text-slate-400">Series returned:</span> {{ result.Results.series.length }}</div>
+
+          <div class="mt-2">
+            <span class="text-slate-400">First series ID:</span>
+            {{ result.Results.series[0]?.seriesID }}
+          </div>
+
+          <div class="mt-2">
+            <span class="text-slate-400">First data point:</span>
+            {{ result.Results.series?.[0]?.data?.[0]?.year ?? '—' }}
+            {{ result.Results.series?.[0]?.data?.[0]?.periodName ?? '—' }}
+            →
+            {{ result.Results.series?.[0]?.data?.[0]?.value ?? '—' }}
+          </div>
+        </div>
+      </section>
         <div class="mt-3 grid gap-2 text-sm text-slate-200">
           <div><span class="text-slate-400">Occupation group:</span> {{ applied()?.occupationGroup ?? '—' }}</div>
           <div><span class="text-slate-400">Time range:</span> {{ applied()?.timeRangeYears ?? '—' }} years</div>
@@ -123,6 +163,33 @@ type ExploreForm = FormGroup<{
   `,
 })
 export class ExploreComponent {
+  constructor(private bls: BlsApiService) {}
+
+  loading = false;
+  error: string | null = null;
+  result: BlsTimeseriesResponse | null = null;
+
+  testCall() {
+    this.loading = true;
+    this.error = null;
+    this.result = null;
+
+    this.bls.timeseries({
+      seriesIds: ['LAUCN040010000000005'],
+      startYear: '2020',
+      endYear: '2024',
+    }).subscribe({
+      next: data => {
+        this.result = data;
+        this.loading = false;
+      },
+      error: err => {
+        this.error = err?.error?.error ?? err?.message ?? 'Request failed';
+        this.loading = false;
+      },
+    });
+  }
+
   // later: replace this with real BLS-fed group names
   occupationGroups = [
     'Management',
