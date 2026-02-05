@@ -4,25 +4,51 @@ import {
   isMainModule,
   writeResponseToNodeResponse,
 } from '@angular/ssr/node';
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { join } from 'node:path';
+import 'dotenv/config';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-/**
- * Example Express Rest API endpoints can be defined here.
- * Uncomment and define endpoints as necessary.
- *
- * Example:
- * ```ts
- * app.get('/api/{*splat}', (req, res) => {
- *   // Handle API request
- * });
- * ```
- */
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.post('/api/bls/timeseries', async (req: Request, res: Response) => {
+  try {
+    const key = process.env['BLS_REGISTRATION_KEY'];
+    if (!key) {
+      return res.status(500).json({ error: 'Missing BLS_REGISTRATION_KEY on server' });
+    }
+
+    // Expect body: { seriesIds: string[], startYear: string, endYear: string }
+    const { seriesIds, startYear, endYear } = req.body ?? {};
+
+    if (!Array.isArray(seriesIds) || !seriesIds.length) {
+      return res.status(400).json({ error: 'seriesIds must be a non-empty string[]' });
+    }
+
+    const payload = {
+      seriesid: seriesIds,
+      startyear: String(startYear ?? ''),
+      endyear: String(endYear ?? ''),
+      registrationkey: key,
+    };
+
+    const blsResp = await fetch('https://api.bls.gov/publicAPI/v2/timeseries/data/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await blsResp.json();
+    return res.status(blsResp.ok ? 200 : blsResp.status).json(data);
+  } catch (err) {
+    return res.status(500).json({ error: 'BLS proxy failed', details: String(err) });
+  }
+});
 
 /**
  * Serve static files from /browser
