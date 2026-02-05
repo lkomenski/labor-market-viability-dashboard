@@ -1,7 +1,7 @@
 export type TimeRangeYears = 5 | 10 | 15;
 
 export interface ExploreFilters {
-  occupationGroup: string;  // e.g., "Management"
+  socMajor: string;  // e.g., "15-0000"
   timeRangeYears: TimeRangeYears;
   metric: 'wage' | 'employment';
   includeNationalBenchmark: boolean;
