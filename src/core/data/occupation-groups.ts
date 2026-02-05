@@ -1,0 +1,26 @@
+import { OccupationGroup } from '../models/occupation-group.model';
+
+export const OCCUPATION_GROUPS: OccupationGroup[] = [
+  { socMajor: '11-0000', slug: 'management', title: 'Management occupations' },
+  { socMajor: '13-0000', slug: 'business-financial', title: 'Business and financial operations occupations' },
+  { socMajor: '15-0000', slug: 'computer-math', title: 'Computer and mathematical occupations' },
+  { socMajor: '17-0000', slug: 'architecture-engineering', title: 'Architecture and engineering occupations' },
+  { socMajor: '19-0000', slug: 'life-physical-social-science', title: 'Life, physical, and social science occupations' },
+  { socMajor: '21-0000', slug: 'community-social-service', title: 'Community and social service occupations' },
+  { socMajor: '23-0000', slug: 'legal', title: 'Legal occupations' },
+  { socMajor: '25-0000', slug: 'education-library', title: 'Educational instruction and library occupations' },
+  { socMajor: '27-0000', slug: 'arts-design-media', title: 'Arts, design, entertainment, sports, and media occupations' },
+  { socMajor: '29-0000', slug: 'healthcare-practitioners', title: 'Healthcare practitioners and technical occupations' },
+  { socMajor: '31-0000', slug: 'healthcare-support', title: 'Healthcare support occupations' },
+  { socMajor: '33-0000', slug: 'protective-service', title: 'Protective service occupations' },
+  { socMajor: '35-0000', slug: 'food-prep-serving', title: 'Food preparation and serving related occupations' },
+  { socMajor: '37-0000', slug: 'building-grounds', title: 'Building and grounds cleaning and maintenance occupations' },
+  { socMajor: '39-0000', slug: 'personal-care-service', title: 'Personal care and service occupations' },
+  { socMajor: '41-0000', slug: 'sales', title: 'Sales and related occupations' },
+  { socMajor: '43-0000', slug: 'office-admin', title: 'Office and administrative support occupations' },
+  { socMajor: '45-0000', slug: 'farming-forestry', title: 'Farming, fishing, and forestry occupations' },
+  { socMajor: '47-0000', slug: 'construction-extraction', title: 'Construction and extraction occupations' },
+  { socMajor: '49-0000', slug: 'installation-repair', title: 'Installation, maintenance, and repair occupations' },
+  { socMajor: '51-0000', slug: 'production', title: 'Production occupations' },
+  { socMajor: '53-0000', slug: 'transportation', title: 'Transportation and material moving occupations' },
+];
