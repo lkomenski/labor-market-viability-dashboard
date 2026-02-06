@@ -4,9 +4,11 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { ExploreFilters } from '../../core/models/explore-filters.model';
 import { BlsApiService } from '../../core/api/bls-api.service';
 import { BlsTimeseriesResponse } from '../../core/models/bls.model';
+import { OCCUPATION_GROUPS } from '../../core/data/occupation-groups';
+import { EpApiService, MajorGroupViability } from '../../core/api/ep-api.services';
 
 type ExploreForm = FormGroup<{
-  occupationGroup: FormControl<string>;
+  socMajor: FormControl<string>;
   timeRangeYears: FormControl<5 | 10 | 15>;
   metric: FormControl<'wage' | 'employment'>;
   includeNationalBenchmark: FormControl<boolean>;
@@ -32,18 +34,18 @@ type ExploreForm = FormGroup<{
               <label class="block text-sm font-medium text-slate-200">Occupation group</label>
               <select
                 class="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                formControlName="occupationGroup"
-                aria-describedby="occupationGroupError"
-                [attr.aria-invalid]="showError('occupationGroup')"
+                formControlName="socMajor"
+                aria-describedby="socMajorError"
+                [attr.aria-invalid]="showError('socMajor')"
               >
                 <option value="" disabled>Select a group…</option>
-                <option *ngFor="let g of occupationGroups" [value]="g">{{ g }}</option>
+                <option *ngFor="let g of occupationGroups" [value]="g.socMajor">{{ g.title }}</option>
               </select>
 
               <p
-                id="occupationGroupError"
+                id="socMajorError"
                 class="mt-2 text-sm text-red-400"
-                *ngIf="showError('occupationGroup')"
+                *ngIf="showError('socMajor')"
               >
                 Please select an occupation group.
               </p>
@@ -64,15 +66,11 @@ type ExploreForm = FormGroup<{
             <div>
               <label class="block text-sm font-medium text-slate-200">Primary metric</label>
               <div class="mt-2 flex gap-3">
-                <label
-                  class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm"
-                >
+                <label class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm">
                   <input type="radio" formControlName="metric" value="wage" />
                   Wage
                 </label>
-                <label
-                  class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm"
-                >
+                <label class="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm">
                   <input type="radio" formControlName="metric" value="employment" />
                   Employment
                 </label>
@@ -86,7 +84,9 @@ type ExploreForm = FormGroup<{
                 formControlName="includeNationalBenchmark"
                 id="bench"
               />
-              <label for="bench" class="text-sm text-slate-200"> Include national benchmark </label>
+              <label for="bench" class="text-sm text-slate-200">
+                Include national benchmark
+              </label>
             </div>
           </div>
 
@@ -110,76 +110,59 @@ type ExploreForm = FormGroup<{
       </section>
 
       <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-        <h2 class="text-lg font-semibold">Current selection</h2>
-        <section class="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">BLS Connection Test</h2>
-            <button
-              type="button"
-              class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400 disabled:opacity-50"
-              (click)="testCall()"
-              [disabled]="loading"
-            >
-              {{ loading ? 'Loading…' : 'Test API' }}
-            </button>
-          </div>
+  <h2 class="text-lg font-semibold">Current selection</h2>
 
-          <p class="text-sm text-slate-300">
-            Temporary dev utility. Next we’ll connect this to your filters and render results.
-          </p>
+  <div class="mt-3 grid gap-2 text-sm text-slate-200">
+    <div><span class="text-slate-400">SOC major:</span> {{ applied()?.socMajor ?? '—' }}</div>
+    <div><span class="text-slate-400">Time range:</span> {{ applied()?.timeRangeYears ?? '—' }} years</div>
+    <div><span class="text-slate-400">Metric:</span> {{ applied()?.metric ?? '—' }}</div>
+    <div><span class="text-slate-400">Benchmark:</span> {{ applied()?.includeNationalBenchmark ? 'On' : 'Off' }}</div>
+  </div>
 
-          <div
-            *ngIf="error"
-            class="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-200"
-          >
-            {{ error }}
-          </div>
+  <p class="mt-4 text-slate-300">
+    Next: connect this selection to occupation-group viability metrics.
+  </p>
+</section>
 
-          <div
-            *ngIf="result"
-            class="rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200"
-          >
-            <div><span class="text-slate-400">Status:</span> {{ result.status }}</div>
-            <div>
-              <span class="text-slate-400">Series returned:</span>
-              {{ result.Results.series.length }}
-            </div>
+<section class="rounded-xl border border-slate-800 bg-slate-900/40 p-5 space-y-3">
+  <div class="flex items-center justify-between">
+    <h2 class="text-lg font-semibold">BLS Connection Test</h2>
+    <button
+      type="button"
+      class="rounded-lg bg-indigo-500 px-4 py-2 text-sm font-medium hover:bg-indigo-400 disabled:opacity-50"
+      (click)="testCall()"
+      [disabled]="loading"
+    >
+      {{ loading ? 'Loading…' : 'Test API' }}
+    </button>
+  </div>
 
-            <div class="mt-2">
-              <span class="text-slate-400">First series ID:</span>
-              {{ result.Results.series[0]?.seriesID }}
-            </div>
+  <p class="text-sm text-slate-300">
+    Temporary dev utility. Next we’ll connect this to your filters and render results.
+  </p>
 
-            <div class="mt-2">
-              <span class="text-slate-400">First data point:</span>
-              {{ result.Results.series?.[0]?.data?.[0]?.year ?? '—' }}
-              {{ result.Results.series?.[0]?.data?.[0]?.periodName ?? '—' }}
-              →
-              {{ result.Results.series?.[0]?.data?.[0]?.value ?? '—' }}
-            </div>
-          </div>
-        </section>
-        <div class="mt-3 grid gap-2 text-sm text-slate-200">
-          <div>
-            <span class="text-slate-400">Occupation group:</span>
-            {{ applied()?.occupationGroup ?? '—' }}
-          </div>
-          <div>
-            <span class="text-slate-400">Time range:</span>
-            {{ applied()?.timeRangeYears ?? '—' }} years
-          </div>
-          <div><span class="text-slate-400">Metric:</span> {{ applied()?.metric ?? '—' }}</div>
-          <div>
-            <span class="text-slate-400">Benchmark:</span>
-            {{ applied()?.includeNationalBenchmark ? 'On' : 'Off' }}
-          </div>
-        </div>
+  <div *ngIf="error" class="rounded-lg border border-red-800 bg-red-950/40 p-3 text-sm text-red-200">
+    {{ error }}
+  </div>
 
-        <p class="mt-4 text-slate-300">
-          Next: wire this form to the BLS API (v2) and render results.
-        </p>
-      </section>
-    </section>
+  <div *ngIf="result" class="rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm text-slate-200">
+    <div><span class="text-slate-400">Status:</span> {{ result.status }}</div>
+    <div><span class="text-slate-400">Series returned:</span> {{ result.Results.series.length }}</div>
+
+    <div class="mt-2">
+      <span class="text-slate-400">First series ID:</span>
+      {{ result.Results.series[0]?.seriesID }}
+    </div>
+
+    <div class="mt-2">
+      <span class="text-slate-400">First data point:</span>
+      {{ result.Results.series?.[0]?.data?.[0]?.year ?? '—' }}
+      {{ result.Results.series?.[0]?.data?.[0]?.periodName ?? '—' }}
+      →
+      {{ result.Results.series?.[0]?.data?.[0]?.value ?? '—' }}
+    </div>
+  </div>
+</section>
   `,
 })
 export class ExploreComponent {
@@ -194,35 +177,26 @@ export class ExploreComponent {
     this.error = null;
     this.result = null;
 
-    this.bls
-      .timeseries({
-        seriesIds: ['LAUCN040010000000005'],
-        startYear: '2020',
-        endYear: '2024',
-      })
-      .subscribe({
-        next: (data) => {
-          this.result = data;
-          this.loading = false;
-        },
-        error: (err) => {
-          this.error = err?.error?.error ?? err?.message ?? 'Request failed';
-          this.loading = false;
-        },
-      });
+    this.bls.timeseries({
+      seriesIds: ['LAUCN040010000000005'],
+      startYear: '2020',
+      endYear: '2024',
+    }).subscribe({
+      next: data => {
+        this.result = data;
+        this.loading = false;
+      },
+      error: err => {
+        this.error = err?.error?.error ?? err?.message ?? 'Request failed';
+        this.loading = false;
+      },
+    });
   }
 
-  // later: replace this with real BLS-fed group names
-  occupationGroups = [
-    'Management',
-    'Business and Financial Operations',
-    'Computer and Mathematical',
-    'Architecture and Engineering',
-    'Healthcare Practitioners and Technical',
-  ];
+ occupationGroups = OCCUPATION_GROUPS;
 
   form: ExploreForm = new FormGroup({
-    occupationGroup: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    socMajor: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     timeRangeYears: new FormControl<5 | 10 | 15>(10, { nonNullable: true }),
     metric: new FormControl<'wage' | 'employment'>('wage', { nonNullable: true }),
     includeNationalBenchmark: new FormControl(true, { nonNullable: true }),
@@ -249,7 +223,7 @@ export class ExploreComponent {
   reset() {
     this.submitted.set(false);
     this.form.reset({
-      occupationGroup: '',
+      socMajor: '',
       timeRangeYears: 10,
       metric: 'wage',
       includeNationalBenchmark: true,
