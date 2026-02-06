@@ -49,7 +49,9 @@ app.post('/api/bls/timeseries', async (req: Request, res: Response) => {
   } catch (err) {
     return res.status(500).json({ error: 'BLS proxy failed', details: String(err) });
   }
-  type MajorGroupRow = {
+});
+
+type MajorGroupRow = {
   socMajor: string;
   title: string;
   employment2024k: number;
@@ -77,31 +79,52 @@ app.get('/api/ep/major-groups', async (_req: Request, res: Response) => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buffer as any);
 
-    const worksheet = workbook.worksheets[0];
-    if (!worksheet) {
-      return res.status(500).json({ error: 'EP workbook has no worksheets' });
-    }
+    const findTableHeader = (ws: ExcelJS.Worksheet) => {
+  let headerRowNumber = -1;
 
-    // Find header row dynamically
-    let headerRowNumber = -1;
-    worksheet.eachRow((row, rowNumber) => {
-      const rowValues = row.values as any[];
-      const values = (rowValues ?? [])
-        .map((v: any) => String(v ?? '').toLowerCase());
-      if (
-        values.some((v: string) => v.includes('national employment matrix code')) &&
-        values.some((v: string) => v.includes('employment, 2024')) &&
-        values.some((v: string) => v.includes('employment, 2034'))
-      ) {
-        headerRowNumber = rowNumber;
-      }
+  ws.eachRow((row, rowNumber) => {
+    const rowValues = row.values as any[];
+    const values = (rowValues ?? []).map((v: any) => String(v ?? '').toLowerCase());
+
+    // Looser matching: allow "2024 national employment matrix code"
+    const hasCode = values.some((v: string) => v.includes('national employment matrix') && v.includes('code'));
+    const hasEmp2024 = values.some((v: string) => v.includes('employment') && v.includes('2024'));
+    const hasEmp2034 = values.some((v: string) => v.includes('employment') && v.includes('2034'));
+
+    // For Table 1.1 we also expect the change columns
+    const hasChangeNumeric = values.some((v: string) => v.includes('change') && v.includes('numeric'));
+    const hasChangePercent = values.some((v: string) => v.includes('change') && v.includes('percent'));
+
+    if (hasCode && hasEmp2024 && hasEmp2034 && hasChangeNumeric && hasChangePercent) {
+      headerRowNumber = rowNumber;
+    }
+  });
+
+  return headerRowNumber;
+};
+
+  // Search every worksheet until we find Table 1.1-like headers
+  let worksheet: ExcelJS.Worksheet | undefined;
+  let headerRowNumber = -1;
+
+  for (const ws of workbook.worksheets) {
+    const found = findTableHeader(ws);
+    if (found !== -1) {
+      worksheet = ws;
+      headerRowNumber = found;
+      break;
+    }
+  }
+
+  if (!worksheet || headerRowNumber === -1) {
+    return res.status(500).json({
+      error: 'Could not locate Table 1.1 header row',
+      sheets: workbook.worksheets.map(w => w.name),
     });
+  }
 
-    if (headerRowNumber === -1) {
-      return res.status(500).json({ error: 'Could not locate Table 1.1 header row' });
-    }
+  const headerRow = worksheet.getRow(headerRowNumber);
 
-    const headerRow = worksheet.getRow(headerRowNumber);
 
     // Map header text -> column index
     const headers: { text: string; col: number }[] = [];
@@ -136,7 +159,7 @@ app.get('/api/ep/major-groups', async (_req: Request, res: Response) => {
       if (rowNumber <= headerRowNumber) return;
 
       const socMajor = String(row.getCell(idxCode).value ?? '').trim();
-      if (!/^\d{2}-0000$/.test(socMajor)) return;
+      if (!/^\d{2}-0000$/.test(socMajor) || socMajor === '00-0000') return;
 
       const title = String(row.getCell(idxTitle).value ?? '').trim();
 
@@ -161,7 +184,7 @@ app.get('/api/ep/major-groups', async (_req: Request, res: Response) => {
         medianWage2024: wage,
       });
     });
-
+    parsed.sort((a, b) => a.socMajor.localeCompare(b.socMajor));
     cachedMajorGroups = parsed;
     return res.json(parsed);
   } catch (err) {
@@ -170,7 +193,6 @@ app.get('/api/ep/major-groups', async (_req: Request, res: Response) => {
       details: String(err),
     });
   }
-});
 });
 
 /**
